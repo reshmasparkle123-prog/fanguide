@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FanGuide — FIFA World Cup 2026 Stadium Assistant</title>
+<style>
+  :root {
+    --primary: #0b8457;
+    --accent: #ffd166;
+    --bg: #0f172a;
+    --card: #1e293b;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    background: linear-gradient(90deg, var(--primary), #065f46);
+    padding: 20px;
+    text-align: center;
+  }
+  header h1 { margin: 0; font-size: 1.6rem; }
+  header p { margin: 4px 0 0; color: #d1fae5; font-size: 0.9rem; }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+    display: grid;
+    gap: 20px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .card h2 { margin-top: 0; font-size: 1.1rem; color: var(--accent); }
+  select, input, button, textarea {
+    font-size: 1rem;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    padding: 10px;
+    background: #0f172a;
+    color: var(--text);
+  }
+  select, input[type=text] { width: 100%; margin-bottom: 10px; }
+  button {
+    background: var(--primary);
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  button:hover { background: #0a6e49; }
+  #chatLog {
+    max-height: 260px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .msg { padding: 10px 14px; border-radius: 10px; max-width: 85%; }
+  .user { align-self: flex-end; background: var(--primary); }
+  .bot { align-self: flex-start; background: #334155; }
+  .chat-row { display: flex; gap: 8px; }
+  .chat-row input { flex: 1; margin-bottom: 0; }
+  .zone-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .zone {
+    padding: 12px;
+    border-radius: 10px;
+    background: #0f172a;
+    border: 1px solid #334155;
+  }
+  .zone-name { font-size: 0.85rem; color: var(--muted); }
+  .zone-pct { font-size: 1.4rem; font-weight: 700; }
+  .LOW { color: #4ade80; }
+  .MODERATE { color: #facc15; }
+  .HIGH { color: #f87171; }
+  .a11y-bar { display: flex; justify-content: flex-end; gap: 10px; }
+  body.a11y-mode { font-size: 1.25rem; line-height: 1.6; }
+  body.a11y-mode .card { padding: 26px; }
+  footer { text-align: center; padding: 20px; color: var(--muted); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏟️ FanGuide</h1>
+  <p>AI-powered multilingual assistant — FIFA World Cup 2026</p>
+</header>
+
+<div class="container">
+
+  <div class="a11y-bar">
+    <button id="a11yToggle" title="Toggle larger text / accessibility mode">♿ Accessibility Mode</button>
+  </div>
+
+  <div class="card">
+    <h2>Ask FanGuide (any language)</h2>
+    <select id="language">
+      <option>English</option>
+      <option>Hindi</option>
+      <option>Spanish</option>
+      <option>Portuguese</option>
+      <option>French</option>
+      <option>Arabic</option>
+      <option>Mandarin</option>
+      <option>Kannada</option>
+    </select>
+    <div id="chatLog"></div>
+    <div class="chat-row">
+      <input type="text" id="question" placeholder="e.g. Where is the nearest restroom?">
+      <button onclick="askFan()">Ask</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Live Crowd Density</h2>
+    <div id="crowdGrid" class="zone-grid"></div>
+  </div>
+
+</div>
+
+<footer>Built for Challenge 4 — GenAI for Stadium Operations · Demo data is simulated</footer>
+
+<script>
+async function askFan() {
+  const question = document.getElementById('question').value.trim();
+  const language = document.getElementById('language').value;
+  if (!question) return;
+
+  const log = document.getElementById('chatLog');
+  log.innerHTML += `<div class="msg user">${escapeHtml(question)}</div>`;
+  document.getElementById('question').value = '';
+  log.scrollTop = log.scrollHeight;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, language })
+    });
+    const data = await res.json();
+    log.innerHTML += `<div class="msg bot">${escapeHtml(data.answer)}</div>`;
+  } catch (e) {
+    log.innerHTML += `<div class="msg bot">Sorry, something went wrong. Please try again.</div>`;
+  }
+  log.scrollTop = log.scrollHeight;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.innerText = str;
+  return div.innerHTML;
+}
+
+document.getElementById('question').addEventListener('keydown', e => {
+  if (e.key === 'Enter') askFan();
+});
+
+async function loadCrowd() {
+  try {
+    const res = await fetch('/api/crowd');
+    const data = await res.json();
+    const grid = document.getElementById('crowdGrid');
+    grid.innerHTML = '';
+    Object.entries(data).forEach(([zone, pct]) => {
+      const status = pct < 40 ? 'LOW' : pct < 70 ? 'MODERATE' : 'HIGH';
+      grid.innerHTML += `
+        <div class="zone">
+          <div class="zone-name">${zone}</div>
+          <div class="zone-pct ${status}">${pct}%</div>
+        </div>`;
+    });
+  } catch (e) { /* silent fail, keep old data on screen */ }
+}
+loadCrowd();
+setInterval(loadCrowd, 5000);
+
+document.getElementById('a11yToggle').addEventListener('click', () => {
+  document.body.classList.toggle('a11y-mode');
+});
+</script>
+
+</body>
+</html>
