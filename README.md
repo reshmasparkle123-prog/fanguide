@@ -3,12 +3,17 @@
 ## Chosen Vertical
 **Multilingual Fan Assistance + Real-Time Navigation & Crowd Management**
 
-FIFA World Cup 2026 will bring fans from over 100 countries into shared stadium
-spaces. Language barriers and unpredictable crowd congestion are two of the
-most immediate, high-frequency pain points for fans — and both are directly
-solvable with Generative AI. FanGuide combines the two into a single,
-demo-ready product: a fan-facing assistant that answers questions in the
-fan's own language while grounding its answers in live stadium conditions.
+FIFA World Cup 2026 is the first tournament hosted across three countries
+(USA, Canada, Mexico) and 16 host cities, expanding to a 48-team format —
+the largest, most linguistically diverse fan base in the tournament's
+history. Venues like MetLife Stadium (New Jersey, host of the final) and
+AT&T Stadium (Dallas) will each see 80,000+ fans from dozens of countries
+converge for single matches. Language barriers and unpredictable crowd
+congestion are two of the most immediate, high-frequency pain points at
+this scale — and both are directly solvable with Generative AI. FanGuide
+combines the two into a single, demo-ready product: a fan-facing assistant
+that answers questions in the fan's own language while grounding its
+answers in live stadium conditions.
 
 ## Approach and Logic
 
@@ -37,6 +42,18 @@ fan's own language while grounding its answers in live stadium conditions.
    network issues during a live demo), `GroqService` falls back to a
    keyword-matching responder so the assistant never goes silent — this
    is a deliberate reliability/testing decision, not a missing feature.
+
+## Security & Reliability
+
+- **Input validation** — `/api/chat` rejects empty or overlong (>500 char)
+  questions with a 400 response, and unrecognized language values are
+  coerced to a safe default rather than passed through unchecked.
+- **Bounded timeouts** — the Groq HTTP client has a 4s connect / 8s read
+  timeout, so a slow or unreachable upstream API can never hang a request;
+  it fails fast into the offline fallback responder instead.
+- **No secrets in source** — `GROQ_API_KEY` is read from environment
+  variables only, is `.gitignore`d wherever a local `.env` might exist, and
+  is never logged or echoed back in API responses.
 
 ## How the Solution Works (Architecture)
 

@@ -3,10 +3,12 @@ package com.fanguide.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -19,12 +21,18 @@ public class GroqService {
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     private static final String MODEL = "llama-3.3-70b-versatile";
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper mapper = new ObjectMapper();
     private final CrowdService crowdService;
 
     public GroqService(CrowdService crowdService) {
         this.crowdService = crowdService;
+        // Bounded timeouts so a slow/unreachable Groq API can never hang a
+        // request indefinitely — falls through to the offline responder instead.
+        this.restTemplate = new RestTemplateBuilder()
+            .connectTimeout(Duration.ofSeconds(4))
+            .readTimeout(Duration.ofSeconds(8))
+            .build();
     }
 
     /**

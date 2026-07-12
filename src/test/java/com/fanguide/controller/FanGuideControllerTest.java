@@ -58,4 +58,41 @@ class FanGuideControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.answer").exists());
     }
+
+    @Test
+    void chatEndpoint_rejectsBlankQuestion() throws Exception {
+        String requestBody = """
+            {"question": "", "language": "English"}
+            """;
+
+        mockMvc.perform(post("/api/chat")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").exists());
+    }
+
+    @Test
+    void chatEndpoint_rejectsOverlongQuestion() throws Exception {
+        String longQuestion = "a".repeat(600);
+        String requestBody = String.format("{\"question\": \"%s\", \"language\": \"English\"}", longQuestion);
+
+        mockMvc.perform(post("/api/chat")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void chatEndpoint_coercesUnrecognizedLanguageToEnglish() throws Exception {
+        String requestBody = """
+            {"question": "Where is Gate 3?", "language": "Klingon"}
+            """;
+
+        mockMvc.perform(post("/api/chat")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.answer").exists());
+    }
 }
