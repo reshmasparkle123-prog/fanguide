@@ -3,12 +3,11 @@ package com.fanguide.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -29,10 +28,10 @@ public class GroqService {
         this.crowdService = crowdService;
         // Bounded timeouts so a slow/unreachable Groq API can never hang a
         // request indefinitely — falls through to the offline responder instead.
-        this.restTemplate = new RestTemplateBuilder()
-            .connectTimeout(Duration.ofSeconds(4))
-            .readTimeout(Duration.ofSeconds(8))
-            .build();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(4000);
+        factory.setReadTimeout(8000);
+        this.restTemplate = new RestTemplate(factory);
     }
 
     /**
