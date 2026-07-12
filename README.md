@@ -26,9 +26,12 @@ fan's own language while grounding its answers in live stadium conditions.
    fans away from congested zones — turning a static FAQ bot into a
    real-time decision-support tool.
 
-3. **Accessibility Mode** — A one-tap toggle increases font size and spacing
-   site-wide, addressing fans with visual or mobility considerations without
-   requiring a separate interface.
+3. **Accessibility** — Beyond the one-tap font-size/spacing toggle, the UI
+   follows WCAG-aligned practices: semantic landmarks (`<main>`, `<section>`),
+   a skip-to-content link, labelled form controls, `aria-live` regions so
+   screen readers announce new chat replies and crowd updates automatically,
+   visible focus outlines for keyboard navigation, and `aria-label`s on all
+   icon-only controls.
 
 4. **Graceful degradation** — If the Groq API is unreachable (rate limits,
    network issues during a live demo), `GroqService` falls back to a
@@ -68,6 +71,25 @@ Spring Boot REST API (/api/chat, /api/crowd)
   nationalities (English, Hindi, Spanish, Portuguese, French, Arabic,
   Mandarin, Kannada); the model can generalize beyond this list since
   language is passed as free text to the prompt.
+
+## Testing
+
+Unit and integration tests cover the core logic:
+
+- `CrowdServiceTest` — validates all 9 zones are returned, density values
+  stay within bounds across repeated calls, and status labels (LOW/MODERATE/
+  HIGH) are generated correctly.
+- `GroqServiceTest` — validates the fallback responder (used whenever
+  `GROQ_API_KEY` is unset or the API is unreachable) never returns a blank
+  answer and stays on-topic for restroom/gate/food questions.
+- `FanGuideControllerTest` — Spring `MockMvc` integration tests for
+  `/api/health`, `/api/crowd`, and `/api/chat`, including the default-language
+  fallback when a client omits `language`.
+
+Run with:
+```bash
+mvn test
+```
 
 ## Running Locally
 
