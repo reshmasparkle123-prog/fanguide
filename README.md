@@ -54,6 +54,12 @@ answers in live stadium conditions.
 - **No secrets in source** — `GROQ_API_KEY` is read from environment
   variables only, is `.gitignore`d wherever a local `.env` might exist, and
   is never logged or echoed back in API responses.
+- **Thread-safe under stadium-scale concurrency** — `CrowdService` is a
+  singleton Spring bean shared across every request. Its mutable state is
+  accessed through `synchronized` methods and every getter returns a
+  defensive copy, so thousands of fans hitting `/api/crowd` in the same
+  second (a realistic World Cup scenario) can't corrupt shared state or
+  read a torn/partial update.
 
 ## How the Solution Works (Architecture)
 
