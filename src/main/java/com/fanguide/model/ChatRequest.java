@@ -1,5 +1,11 @@
 package com.fanguide.model;
 
+/**
+ * Request payload for POST /api/chat.
+ * {@code language} is optional — the controller defaults to "English" and
+ * coerces any unrecognized value to a safe default before it reaches the
+ * AI prompt.
+ */
 public class ChatRequest {
     private String question;
     private String language;

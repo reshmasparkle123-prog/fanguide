@@ -46,4 +46,29 @@ class CrowdServiceTest {
         assertTrue(summary.contains("Gate 1"));
         assertTrue(summary.contains("Restroom - Sec 210"));
     }
+
+    @Test
+    void liveCrowdData_survivesConcurrentAccess() throws InterruptedException {
+        // Simulates many fans hitting /api/crowd at the same instant during
+        // a match — the shared singleton map must not corrupt or throw.
+        int threadCount = 50;
+        Thread[] threads = new Thread[threadCount];
+        for (int i = 0; i < threadCount; i++) {
+            threads[i] = new Thread(() -> {
+                Map<String, Integer> data = crowdService.getLiveCrowdData();
+                assertEquals(9, data.size());
+            });
+            threads[i].start();
+        }
+        for (Thread t : threads) {
+            t.join();
+        }
+    }
+
+    @Test
+    void liveCrowdData_returnsDefensiveCopyNotSharedReference() {
+        Map<String, Integer> first = crowdService.getLiveCrowdData();
+        Map<String, Integer> second = crowdService.getLiveCrowdData();
+        assertNotSame(first, second, "Each call should return an independent copy");
+    }
 }

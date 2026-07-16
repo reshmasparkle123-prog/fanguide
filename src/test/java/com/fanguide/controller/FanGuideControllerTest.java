@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.containsStringIgnoringCase;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -43,7 +44,8 @@ class FanGuideControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.answer").exists());
+            .andExpect(jsonPath("$.answer").exists())
+            .andExpect(jsonPath("$.answer").value(containsStringIgnoringCase("restroom")));
     }
 
     @Test
@@ -56,7 +58,7 @@ class FanGuideControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.answer").exists());
+            .andExpect(jsonPath("$.answer").isNotEmpty());
     }
 
     @Test
@@ -69,7 +71,7 @@ class FanGuideControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.error").exists());
+            .andExpect(jsonPath("$.error").value(containsStringIgnoringCase("must not be empty")));
     }
 
     @Test
@@ -80,7 +82,8 @@ class FanGuideControllerTest {
         mockMvc.perform(post("/api/chat")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").value(containsStringIgnoringCase("maximum length")));
     }
 
     @Test
@@ -93,6 +96,6 @@ class FanGuideControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.answer").exists());
+            .andExpect(jsonPath("$.answer").isNotEmpty());
     }
 }

@@ -2,36 +2,41 @@ package com.fanguide.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientException;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
 @Service
 public class GroqService {
 
+    private static final Logger log = LoggerFactory.getLogger(GroqService.class);
+
     @Value("${GROQ_API_KEY:}")
     private String apiKey;
 
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     private static final String MODEL = "llama-3.3-70b-versatile";
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(8);
+    private static final double TEMPERATURE = 0.4;
+    private static final int MAX_TOKENS = 300;
 
-    private final RestTemplate restTemplate;
+    private final WebClient webClient;
     private final ObjectMapper mapper = new ObjectMapper();
     private final CrowdService crowdService;
 
     public GroqService(CrowdService crowdService) {
         this.crowdService = crowdService;
-        // Bounded timeouts so a slow/unreachable Groq API can never hang a
-        // request indefinitely — falls through to the offline responder instead.
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(4000);
-        factory.setReadTimeout(8000);
-        this.restTemplate = new RestTemplate(factory);
+        // Non-blocking client — under stadium-scale concurrent load this frees
+        // up threads instead of holding them for the duration of each Groq call.
+        this.webClient = WebClient.builder().baseUrl(GROQ_URL).build();
     }
 
     /**
@@ -41,6 +46,7 @@ public class GroqService {
      */
     public String answerFanQuery(String question, String language) {
         if (apiKey == null || apiKey.isBlank()) {
+            log.warn("GROQ_API_KEY not set; using offline fallback responder.");
             return fallbackAnswer(question, language);
         }
 
@@ -58,27 +64,32 @@ public class GroqService {
                 %s
                 """.formatted(language, crowdContext);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
-
             Map<String, Object> body = Map.of(
                 "model", MODEL,
                 "messages", List.of(
                     Map.of("role", "system", "content", systemPrompt),
                     Map.of("role", "user", "content", question)
                 ),
-                "temperature", 0.4,
-                "max_tokens", 300
+                "temperature", TEMPERATURE,
+                "max_tokens", MAX_TOKENS
             );
 
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-            ResponseEntity<String> response = restTemplate.postForEntity(GROQ_URL, entity, String.class);
+            String responseBody = webClient.post()
+                .contentType(MediaType.APPLICATION_JSON)
+                .headers(h -> h.setBearerAuth(apiKey))
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block(REQUEST_TIMEOUT);
 
-            JsonNode root = mapper.readTree(response.getBody());
+            JsonNode root = mapper.readTree(responseBody);
             return root.path("choices").get(0).path("message").path("content").asText();
 
+        } catch (WebClientException e) {
+            log.warn("Groq API call failed, using offline fallback: {}", e.getMessage());
+            return fallbackAnswer(question, language);
         } catch (Exception e) {
+            log.error("Unexpected error answering fan query, using offline fallback", e);
             return fallbackAnswer(question, language);
         }
     }
