@@ -49,8 +49,6 @@ class CrowdServiceTest {
 
     @Test
     void liveCrowdData_survivesConcurrentAccess() throws InterruptedException {
-        // Simulates many fans hitting /api/crowd at the same instant during
-        // a match — the shared singleton map must not corrupt or throw.
         int threadCount = 50;
         Thread[] threads = new Thread[threadCount];
         for (int i = 0; i < threadCount; i++) {
@@ -66,9 +64,9 @@ class CrowdServiceTest {
     }
 
     @Test
-    void liveCrowdData_returnsDefensiveCopyNotSharedReference() {
-        Map<String, Integer> first = crowdService.getLiveCrowdData();
-        Map<String, Integer> second = crowdService.getLiveCrowdData();
-        assertNotSame(first, second, "Each call should return an independent copy");
+    void liveCrowdData_isImmutableSnapshot() {
+        Map<String, Integer> data = crowdService.getLiveCrowdData();
+        assertThrows(UnsupportedOperationException.class, () -> data.put("New Zone", 50),
+            "Snapshot should be unmodifiable — callers can't corrupt shared state");
     }
 }

@@ -1,21 +1,17 @@
 package com.fanguide.service;
 
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Simulates a live stadium crowd-density feed. In a production system this
- * would be fed by turnstile counters / CCTV analytics; here it generates
- * realistic fluctuating values per zone so the AI layer has something live
- * to reason over during the demo.
- *
- * This is a singleton Spring bean shared across all concurrent requests —
- * at stadium scale, thousands of fans can hit /api/crowd and /api/chat in
- * the same second, so all mutable state access is synchronized and every
- * getter returns a defensive copy rather than the live internal map.
- */
+* Simulates a live stadium crowd-density feed. Reads are lock-free: the
+* scheduled updater is the only writer, so /api/crowd and /api/chat can be
+* hit by thousands of concurrent fans without any per-request locking.
+*/
 @Service
 public class CrowdService {
 
@@ -25,21 +21,32 @@ public class CrowdService {
         "Restroom - Sec 108", "Restroom - Sec 210"
     );
 
-    private final Map<String, Integer> density = new LinkedHashMap<>();
+    private final AtomicReference<Map<String, Integer>> snapshot =
+        new AtomicReference<>(initialSnapshot());
 
-    public CrowdService() {
+    private static Map<String, Integer> initialSnapshot() {
+        Map<String, Integer> initial = new LinkedHashMap<>();
         for (String zone : ZONES) {
-            density.put(zone, ThreadLocalRandom.current().nextInt(20, 80));
+            initial.put(zone, ThreadLocalRandom.current().nextInt(20, 80));
         }
+        return Collections.unmodifiableMap(initial);
     }
 
-    /** Nudges each zone's density up/down slightly to simulate live movement. */
-    public synchronized Map<String, Integer> getLiveCrowdData() {
-        density.replaceAll((zone, current) -> {
+    /** Nudges values every 3s to simulate live movement, decoupled from reads. */
+    @Scheduled(fixedRate = 3000)
+    public void refreshCrowdData() {
+        Map<String, Integer> current = snapshot.get();
+        Map<String, Integer> next = new LinkedHashMap<>();
+        current.forEach((zone, value) -> {
             int delta = ThreadLocalRandom.current().nextInt(-10, 11);
-            return Math.max(5, Math.min(98, current + delta));
+            next.put(zone, Math.max(5, Math.min(98, value + delta)));
         });
-        return new LinkedHashMap<>(density); // defensive copy — callers can't mutate shared state
+        snapshot.set(Collections.unmodifiableMap(next));
+    }
+
+    /** O(1), lock-free read — safe to call from any thread, any volume. */
+    public Map<String, Integer> getLiveCrowdData() {
+        return snapshot.get();
     }
 
     public String getCrowdSummaryForPrompt() {
